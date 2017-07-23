@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Multi Muses</title>
+ <script src="js/d3.v4.min.js" ></script>
+ <script src="js/howler.core.js"></script>
+ <!--  <link rel="stylesheet" href="css/howler.css">-->
+ 
+ <style type="text/css">
+	body {
+		cursor: default;
+		text-align: center;
+		background-color:black;
+		height:100%;
+		width:100%;
+	}
+
+ </style>
+ 
+</head>
+<body>
+<!--  
+<audio id="s0" autoplay loop controls>
+  <source  src="audio/musicbrainz.org_recording_8b95a4aa-a762-4221-9171-6f10f2f66fe1_1m.19.466.ogg" type="audio/ogg">
+Your browser does not support the audio element.
+</audio>
+<audio id="s1" loop controls>
+  <source  src="audio/musicbrainz.org_recording_8b95a4aa-a762-4221-9171-6f10f2f66fe1_1m.19.466.ogg" type="audio/ogg">
+Your browser does not support the audio element.
+</audio>
+-->
+<!--  
+<div onclick="pause()">PAUSE SPRITE</div>
+<div onclick="joue()">JOUE SPRITE</div>
+-->
+  <!-- Waveform 
+  <div id="waveform"></div>
+  -->
+  <!-- Sprite Click Areas 
+  <div class="sprites" id="contSprite">
+	<div id="sprite0" class="sprite">
+		<div class="sprite-label">One</div>
+	</div>
+  </div>
+-->
+
+<script type="text/javascript">
+
+var ficAudio = 'audio/musicbrainz.org_recording_8b95a4aa-a762-4221-9171-6f10f2f66fe1_.mp3';
+//var ficAudio = 'audio/musicbrainz.org_recording_8b95a4aa-a762-4221-9171-6f10f2f66fe1_1m.19.466.ogg';
+var large = window.innerWidth,
+ haut = window.innerHeight,
+ hautPas = 100,
+ cStoke = 'white', cStokeMarque = 'black',
+ pcTOinG = d3.scaleLinear()
+	.domain([0, 100])
+	.range([1, 0]),
+ color = d3.interpolateMagma;
+
+// Setup the sounds to be used.
+var son = new Howl({
+  src: [ficAudio],
+  html5: true
+});
+
+//Commence le traitement quand le son est chargé
+son.once('load', function() {
+	var dur = son._duration*1000;
+	var randomDeb = d3.randomUniform(1, dur);
+	var randomDur = d3.randomUniform(1, dur/10);
+	var randomNbFrag = d3.randomUniform(32, 64);
+	var randomInter = d3.randomUniform(1000, 10000);
+		
+	//création des sprites
+	var rnd = randomNbFrag(), s={}, sM=[];
+	var randomFrag = d3.randomUniform(0, rnd);
+	for (var i=0; i<rnd; i++) {
+		var db = randomDeb();
+		var dr = randomDur();
+		s['s'+i]=[db,dr];
+		sM.push({'i':i,num:0,id:'s'+i,deb:s['s'+i][0],dur:s['s'+i][1],nb:0});
+	}	
+
+	//Setup our new sprite class and pass in the options.
+	var sprite = new Sprite({
+	  src: [ficAudio],
+	  sprite: s,
+	  spriteMap: sM,
+	  x: d3.scaleLinear()
+	    .domain([0, dur])
+	    .range([0, large]),
+	  y: d3.scaleLinear()
+		    .domain([0, (sM.length*hautPas)])
+		    .range([0, haut]),
+	  h: haut,
+	  w: large,
+	  pH: hautPas,
+	});
+
+
+	//lance les lectures automatiques
+	for (var i=0; i<1; i++) {
+		//dans un interval aléatoire
+		var rnd = randomInter();
+		console.log(rnd);
+		window.setTimeout(function(){
+			//pour un fragment aléatoire
+			var ind = parseInt(randomFrag());
+			var d = sM[ind];
+			d.num=i;
+			var g = d3.select("#"+d.id);
+			//joue le son
+			sprite.play({'d':d,'g':g});
+		},rnd);
+	}	
+	
+	
+});
+
+
+/**
+ * Sprite class containing the state of our sprites to play and their progress.
+ * @param {Object} options Settings to pass into and setup the sound and visuals.
+ */
+var Sprite = function(options) {
+  var self = this;
+
+  self.sounds = [];
+
+  // Setup the options to define this sprite display.
+  self.x = options.x;
+  self.y = options.y;
+  self.h = options.h;
+  self.w = options.w;
+  self.pH =  options.pH,
+  self.cH =  options.y(options.pH),
+
+  self._sprite = options.sprite;
+  self._spriteMap = options.spriteMap;
+
+  //création des rectangles
+  var svg = d3.select('body').append('svg')
+  	.attr('height',options.h)
+  	.attr('width',options.w);
+  
+  /*rectangle de la scène
+  svg.append('rect')
+  	.attr('fill','white')
+	.attr('stroke','red')
+  	.attr('y',0)
+  	.attr('x',0)
+  	.attr('width',options.w)
+  	.attr('height',options.h);
+  */
+  
+  
+  var frags = svg.selectAll('.frag')
+  	.data(options.spriteMap).enter().append('g')
+  	.attr('id',function(d,i){
+  		return d.id;
+	  	})
+	.attr("transform",function(d, i){
+  		return "translate(" + options.x(d.deb) + "," + options.y(i*options.pH) + ")";
+  		})
+  	.on('click',function(d){
+		var g = d3.select(this);  		
+  		self.play({'d':d,'g':g});
+	  	});
+
+  frags.append('rect')
+  	.attr('id',function(d,i){
+  		return 'rec'+d.id;
+	  	})
+	.attr('class','rec')
+	.attr('fill',function(d){
+	  	return color(pcTOinG(d.nb));
+	  	})
+	 .attr('stroke',cStoke)
+  	.attr('y',0)
+  	.attr('x',0)
+  	.attr('width',function(d){
+  		return options.x(d.dur);
+	  	})
+  	.attr('height',self.cH);
+          
+  
+  // Create our audio sprite definition.
+  self.sound = new Howl({
+    src: options.src,
+    sprite: options.sprite
+  });
+
+  // Setup a resize event and fire it to setup our sprite overlays.
+  window.addEventListener('resize', function() {
+    self.resize();
+  }, false);
+  self.resize();
+
+  // Begin the progress step tick.
+  requestAnimationFrame(self.step.bind(self));
+};
+
+Sprite.prototype = {
+
+  /**
+   * Play a sprite when clicked and track the progress.
+   * @param  {String} key Key in the sprite map object.
+   */
+  play: function(d) {
+    var self = this;
+    var sprite = d.d.id;
+
+    // Play the sprite sound and capture the ID.
+    var id = self.sound.play(sprite);
+    d.id = id;
+    
+    //augmente le nombre de lecture du fragment
+    d.d.nb +=10;
+    
+	var m = d.g.append('rect')
+	  	.attr('id','m'+id)
+	  	.attr('class','marque')
+	  	.attr('width',2)
+	  	//.attr('height',self.cH)
+	  	.attr('height',haut)	  	
+		.attr('fill',function(d){
+		  	return d3.rgb(color(pcTOinG(d.nb))).brighter(1);
+		  	})
+	  	.attr('stroke',cStokeMarque)
+	  	.attr("transform",function(d, i){
+	  		return "translate(0,0)";
+	  		});
+	/*
+	var m = d.g.append('circle')
+	  	.attr('id','m'+id)
+	  	.attr('class','marque')
+	  	.attr('r',self.cH/2)
+	  	.attr('fill','green')
+	  	.attr('stroke','yellow')
+	  	.attr("transform",function(d, i){
+	  		return "translate(0,"+self.y(self.cH/2)+")";
+	  		});
+    */
+    self.sounds.push(d);
+
+    // When this sound is finished, remove the progress element.
+    self.sound.once('end', function() {
+      var dt=false, ind;
+      self.sounds.forEach(function(d,i){if(d.id == id){dt = d;ind=i;}});
+      if (dt) {
+      	d3.select('#m'+dt.id).remove();
+      	var c = d3.select('#rec'+dt.d.id).attr('fill');
+      	d3.select('#rec'+dt.d.id).style("fill", color(pcTOinG(dt.d.nb)));
+        self.sounds.splice(ind, 1);
+        //window['s'+i].removeChild(elm);
+      }
+    }, id);
+  },
+
+  /**
+   * Called on window resize to correctly psotion and size the click overlays.
+   */
+  resize: function() {
+    var self = this;
+
+    // Calculate the scale of our window from "full" size.
+    var scale = window.innerWidth / 3600;
+
+    /* Resize and reposition the sprite overlays.
+    var keys = Object.keys(self._spriteMap);
+    for (var i=0; i<keys.length; i++) {
+      var sprite = window[keys[i]];
+      sprite.style.width = Math.round(self._width[i] * scale) + 'px';
+      if (self._left[i]) {
+        sprite.style.left = Math.round(self._left[i] * scale) + 'px';
+      }
+    }
+    */
+  },
+
+  /**
+   * The step called within requestAnimationFrame to update the playback positions.
+   */
+  step: function() {
+    var self = this;
+
+    // Loop through all active sounds and update their progress bar.
+    for (var i=0; i<self.sounds.length; i++) {
+      //récupère la paramètres du fragment et son avancement
+    	  var d = self.sounds[i].d;
+      var idG = d.id;
+      var id = parseInt(self.sounds[i].id, 10);
+      var offset = self._sprite[idG][0];
+      var seek = (self.sound.seek(id) || 0) - (offset / 1000);      
+
+      //change la couleur
+      d3.select('#rec'+d.id).style("fill",color(pcTOinG(d.nb)));
+	  
+	  //bouge la marque
+      var x = self.x(seek*1000);
+      var y = 0;//self.cH/2;
+      //console.log('step x ='+x+' y='+y);
+      d3.select('#m'+id)
+      	.attr("transform","translate("+x+","+y+")");
+      
+      //vérifie la continuation du lien sur le début d'un autre fragment      
+      var fDeb = parseInt(d.deb+(seek*1000));
+      self._spriteMap.forEach(function(f){
+		console.log(f.id+" "+idG+" : "+parseInt(f.deb)+" "+fDeb)
+    	  	if(f.id!=idG && parseInt(f.deb)==fDeb){
+  			var g = d3.select('#'+f.id);
+  			self.play({'d':d,'g':g});
+  		}  
+	  });
+      
+    }
+
+    requestAnimationFrame(self.step.bind(self));
+  }
+};
+
+
+/*
+var dtSon = [{fic:'audio/musicbrainz.org_recording_8b95a4aa-a762-4221-9171-6f10f2f66fe1_1m.19.466.ogg', nb:10, delais:1000}];
+
+dtSon.forEach(function(d){
+	for
+	
+	
+	d3.select('body').data(dtSon).enter()
+	.append('audio')
+	.attr('id',function(d) { return 'son'+i); }
+                r: function(d) { return radiusScale(d); },
+                cx: svgWidth / 2,
+                cy: svgHeight / 2,
+                fill: 'none', 
+                'stroke-width': 4,
+                'stroke-opacity': 0.4,
+                stroke: 
+           });
+	
+	
+});
+
+
+var i=0, joue=true;
+window.setTimeout(function(){
+	i++;
+	var s = document.getElementById("s"+i); 
+    s.play(); 
+	if(i>1)joue=false;
+	},1000);
+*/
+
+</script>
+
+</body>
+</html>
